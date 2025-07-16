@@ -2,10 +2,10 @@
 using System.Data;
 using System.Windows;
 
-namespace App;
+namespace Sep490ClassDocumentGenerator;
 
 /// <summary>
-/// Interaction logic for App.xaml
+/// Interaction logic for Sep490ClassDocumentGenerator.xaml
 /// </summary>
 public partial class App : Application
 {

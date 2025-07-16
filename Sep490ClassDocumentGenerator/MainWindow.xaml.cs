@@ -1,20 +1,17 @@
-﻿using System;
+﻿using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
-using System.Linq;
-using System.Collections.Generic;
 using System.Windows;
+using DocumentFormat.OpenXml;
+using DocumentFormat.OpenXml.Packaging;
+using DocumentFormat.OpenXml.Wordprocessing;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using DocumentFormat.OpenXml.Packaging;
-using DocumentFormat.OpenXml.Wordprocessing;
-using DocumentFormat.OpenXml;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
 using Microsoft.Win32;
 using Style = DocumentFormat.OpenXml.Wordprocessing.Style;
 
-namespace ClassDocGenerator
+namespace Sep490ClassDocumentGenerator
 {
     public partial class MainWindow : Window
     {
@@ -179,50 +176,62 @@ namespace ClassDocGenerator
             var namespaces = root.DescendantNodes().OfType<BaseNamespaceDeclarationSyntax>();
             foreach (var ns in namespaces)
             {
-                foreach (var classDecl in ns.DescendantNodes().OfType<ClassDeclarationSyntax>())
+                foreach (var classDecl in ns.Members.OfType<ClassDeclarationSyntax>())
                 {
-                    var className = classDecl.Identifier.Text;
-                    var nsParts = ns.Name.ToString().Split('.');
-                    var nsName = string.Join('/', nsParts.Skip(1));
-                    var classInfo = new ClassInfo
-                    {
-                        ClassName = className,
-                        Namespace = nsName
-                    };
-
-                    foreach (var prop in classDecl.Members.OfType<PropertyDeclarationSyntax>())
-                    {
-                        classInfo.Attributes.Add(new ClassMember
-                        {
-                            Name = prop.Identifier.Text,
-                            Type = prop.Type.ToString(),
-                            Visibility = GetVisibility(prop.Modifiers),
-                            Purpose = ""
-                        });
-                    }
-
-                    foreach (var method in classDecl.Members.OfType<MethodDeclarationSyntax>())
-                    {
-                        classInfo.Methods.Add(new MethodMember
-                        {
-                            Name = method.Identifier.Text,
-                            ReturnType = method.ReturnType.ToString(),
-                            Visibility = GetVisibility(method.Modifiers),
-                            Purpose = "",
-                            Parameters = method.ParameterList.Parameters
-                                .Select(p => new ParameterInfo
-                                {
-                                    Name = p.Identifier.Text,
-                                    Type = p.Type.ToString(),
-                                    Description = ""
-                                }).ToList()
-                        });
-                    }
-
-                    classInfos.Add(classInfo);
+                    ProcessClass(classDecl, ns.Name.ToString(), classInfos, null);
                 }
             }
         }
+        
+        private void ProcessClass(ClassDeclarationSyntax classDecl, string namespaceName, List<ClassInfo> classInfos, string parentClass)
+        {
+            string fullClassName = parentClass == null ? classDecl.Identifier.Text : $"{parentClass}.{classDecl.Identifier.Text}";
+
+            var classInfo = new ClassInfo
+            {
+                ClassName = fullClassName,
+                Namespace = namespaceName
+            };
+
+            foreach (var prop in classDecl.Members.OfType<PropertyDeclarationSyntax>())
+            {
+                classInfo.Attributes.Add(new ClassMember
+                {
+                    Name = prop.Identifier.Text,
+                    Type = prop.Type.ToString(),
+                    Visibility = GetVisibility(prop.Modifiers),
+                    Purpose = ""
+                });
+            }
+
+            foreach (var method in classDecl.Members.OfType<MethodDeclarationSyntax>())
+            {
+                classInfo.Methods.Add(new MethodMember
+                {
+                    Name = method.Identifier.Text,
+                    ReturnType = method.ReturnType.ToString(),
+                    Visibility = GetVisibility(method.Modifiers),
+                    Purpose = "",
+                    Parameters = method.ParameterList.Parameters
+                        .Select(p => new ParameterInfo
+                        {
+                            Name = p.Identifier.Text,
+                            Type = p.Type.ToString(),
+                            Description = ""
+                        }).ToList()
+                });
+            }
+
+            classInfos.Add(classInfo);
+
+            // 🔁 Xử lý class lồng trong class hiện tại
+            foreach (var nestedClass in classDecl.Members.OfType<ClassDeclarationSyntax>())
+            {
+                ProcessClass(nestedClass, namespaceName, classInfos, fullClassName);
+            }
+        }
+
+
 
         // Original GetVisibility method
         private string GetVisibility(SyntaxTokenList modifiers)

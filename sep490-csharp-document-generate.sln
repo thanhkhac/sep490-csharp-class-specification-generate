@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "App", "App\App.csproj", "{2835EFA7-08BF-49AE-BB6A-C6D257A1F25C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sep490ClassDocumentGenerator", "Sep490ClassDocumentGenerator\Sep490ClassDocumentGenerator.csproj", "{2835EFA7-08BF-49AE-BB6A-C6D257A1F25C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

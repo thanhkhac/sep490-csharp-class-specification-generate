@@ -1,4 +1,4 @@
-﻿<Window x:Class="ClassDocGenerator.MainWindow"
+﻿<Window x:Class="Sep490ClassDocumentGenerator.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Class Documentation Generator" Height="600" Width="800">

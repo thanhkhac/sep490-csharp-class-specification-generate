@@ -269,8 +269,8 @@ namespace Sep490ClassDocumentGenerator
                 int sectionIndex = 1;
                 foreach (var namespaceGroup in groupedClasses)
                 {
-                    // Use custom startIndex for namespace sections
-                    var namespacePara = new Paragraph(new Run(new Text($"{startIndex}.{sectionIndex} {namespaceGroup.Key}")));
+                    string displayNamespace = string.Join("/", namespaceGroup.Key.Split('.').Skip(1));
+                    var namespacePara = new Paragraph(new Run(new Text($"{startIndex}.{sectionIndex} {displayNamespace}")));
                     namespacePara.ParagraphProperties = new ParagraphProperties(new ParagraphStyleId() { Val = "Heading2" });
                     body.AppendChild(namespacePara);
 

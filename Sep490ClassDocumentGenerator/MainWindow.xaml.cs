@@ -141,8 +141,24 @@ namespace Sep490ClassDocumentGenerator
             {
                 var classInfos = new List<ClassInfo>();
                 foreach (var file in selectedFiles) { ProcessFile(file, classInfos); }
-                CreateWordDoc(classInfos, OutputFileTextBox.Text, startIndex);
-                MessageBox.Show("Document generated successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                var selectionWindow = new ClassSelectionWindow(classInfos);
+                
+                if (selectionWindow.ShowDialog() == true)
+                {
+                    var selectedClasses = selectionWindow.FilteredClasses
+                        .Where(c => c.IsSelected)
+                        .Select(c => c.ClassInfo)
+                        .ToList();
+
+                    if (!selectedClasses.Any())
+                    {
+                        MessageBox.Show("No classes selected.", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+
+                    CreateWordDoc(selectedClasses, OutputFileTextBox.Text, startIndex);
+                    MessageBox.Show("Document generated successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
             }
             catch (Exception ex) { MessageBox.Show($"Error generating document: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error); }
         }

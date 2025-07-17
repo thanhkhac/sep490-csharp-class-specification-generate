@@ -145,10 +145,7 @@ namespace Sep490ClassDocumentGenerator
                 
                 if (selectionWindow.ShowDialog() == true)
                 {
-                    var selectedClasses = selectionWindow.FilteredClasses
-                        .Where(c => c.IsSelected)
-                        .Select(c => c.ClassInfo)
-                        .ToList();
+                    var selectedClasses = selectionWindow.GetSelectedClasses();
 
                     if (!selectedClasses.Any())
                     {

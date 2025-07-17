@@ -74,6 +74,14 @@ namespace Sep490ClassDocumentGenerator
             DialogResult = false;
             Close();
         }
+        
+        public List<ClassInfo> GetSelectedClasses()
+        {
+            return _allClasses
+                .Where(c => c.IsSelected)
+                .Select(c => c.ClassInfo)
+                .ToList();
+        }
     }
 
     public class SelectableClass

@@ -13,8 +13,14 @@ using Style = DocumentFormat.OpenXml.Wordprocessing.Style;
 
 namespace Sep490ClassDocumentGenerator
 {
+    /// <summary>
+    /// Đây là description của class
+    /// </summary>
     public partial class MainWindow : Window
     {
+        /// <summary>
+        /// Đây là description của attribute
+        /// </summary>
         private ObservableCollection<FileSystemNode> _fileSystemNodes;
 
         public MainWindow()
@@ -25,6 +31,11 @@ namespace Sep490ClassDocumentGenerator
         }
 
         // Select source folder using WPF's OpenFolderDialog (.NET 8+)
+        /// <summary>
+        /// Đây là description của method
+        /// </summary>
+        /// <param name="sender">Description của sender</param>
+        /// <param name="e">Description của e</param>
         private void SelectFolderButton_Click(object sender, RoutedEventArgs e)
         {
             var dialog = new OpenFolderDialog
@@ -536,6 +547,15 @@ namespace Sep490ClassDocumentGenerator
                                 CreateNormalRun(attr.Type)
                             );
 
+                            if (!string.IsNullOrWhiteSpace(attr.Summary))
+                            {
+                                descParagraph.Append(
+                                    new Break(),
+                                    CreateBoldUnderlineRun("Description: "),
+                                    CreateNormalRun(attr.Summary)
+                                );
+                            }
+
                             var descCell = new TableCell(descParagraph);
                             descCell.TableCellProperties = new TableCellProperties(
                                 new TableCellMargin(
@@ -628,10 +648,19 @@ namespace Sep490ClassDocumentGenerator
                                 CreateNormalRun($"{method.Visibility}"),
                                 new Break(),
                                 CreateBoldUnderlineRun("Return: "),
-                                CreateNormalRun($"{method.ReturnType}"),
-                                new Break(),
-                                CreateBoldUnderlineRun("Purpose: "),
-                                CreateNormalRun(""),
+                                CreateNormalRun($"{method.ReturnType}")
+                            );
+
+                            if (!string.IsNullOrWhiteSpace(method.Summary))
+                            {
+                                descParagraph.Append(
+                                    new Break(),
+                                    CreateBoldUnderlineRun("Description: "),
+                                    CreateNormalRun(method.Summary)
+                                );
+                            }
+
+                            descParagraph.Append(
                                 new Break(),
                                 CreateBoldUnderlineRun("Parameters: ")
                             );
@@ -641,12 +670,17 @@ namespace Sep490ClassDocumentGenerator
                                 descParagraph.Append(new Break());
                                 foreach (var param in method.Parameters)
                                 {
+                                    var summary = string.IsNullOrWhiteSpace(param.Summary)
+                                        ? ""
+                                        : $" - {param.Summary}";
+
                                     descParagraph.Append(
-                                        CreateNormalRun($"- {param.Name}: {param.Type}"),
+                                        CreateNormalRun($"- {param.Name}: {param.Type}, {summary}"),
                                         new Break()
                                     );
                                 }
                             }
+
                             else { descParagraph.Append(CreateNormalRun("None")); }
 
                             var descCell = new TableCell(descParagraph);

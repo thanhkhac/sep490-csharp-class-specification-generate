@@ -195,7 +195,7 @@ namespace Sep490ClassDocumentGenerator
             var members = decl.Members;
             bool isInInterface = decl is InterfaceDeclarationSyntax;
 
-            // ✅ Properties
+            // Properties
             foreach (var prop in members.OfType<PropertyDeclarationSyntax>())
             {
                 classInfo.Attributes.Add(new ClassMember
@@ -206,8 +206,23 @@ namespace Sep490ClassDocumentGenerator
                     Summary = GetXmlSummary(prop)
                 });
             }
+            
+            // Fields 
+            foreach (var field in members.OfType<FieldDeclarationSyntax>())
+            {
+                foreach (var variable in field.Declaration.Variables)
+                {
+                    classInfo.Attributes.Add(new ClassMember
+                    {
+                        Name = variable.Identifier.Text,
+                        Type = field.Declaration.Type.ToString(),
+                        Visibility = GetVisibility(field.Modifiers, isInInterface),
+                        Summary = GetXmlSummary(field)
+                    });
+                }
+            }
 
-            // ✅ Methods
+            // Methods
             foreach (var method in members.OfType<MethodDeclarationSyntax>())
             {
                 var paramDescriptions = GetXmlParamDescriptions(method);
@@ -545,19 +560,19 @@ namespace Sep490ClassDocumentGenerator
 
                             var descParagraph = new Paragraph();
                             descParagraph.Append(
-                                CreateBoldUnderlineRun("Visibility: "),
-                                CreateNormalRun(attr.Visibility),
+                                CreateBoldUnderlineRun("Visibility:"),
+                                CreateNormalRun(" " + attr.Visibility),
                                 new Break(),
                                 CreateBoldUnderlineRun("Type: "),
-                                CreateNormalRun(attr.Type)
+                                CreateNormalRun(" " + attr.Type)
                             );
 
                             if (!string.IsNullOrWhiteSpace(attr.Summary))
                             {
                                 descParagraph.Append(
                                     new Break(),
-                                    CreateBoldUnderlineRun("Description: "),
-                                    CreateNormalRun(attr.Summary)
+                                    CreateBoldUnderlineRun("Description:"),
+                                    CreateNormalRun(" " + attr.Summary)
                                 );
                             }
 
@@ -649,11 +664,11 @@ namespace Sep490ClassDocumentGenerator
 
                             var descParagraph = new Paragraph();
                             descParagraph.Append(
-                                CreateBoldUnderlineRun("Visibility: "),
-                                CreateNormalRun($"{method.Visibility}"),
+                                CreateBoldUnderlineRun("Visibility:"),
+                                CreateNormalRun($" {method.Visibility}"),
                                 new Break(),
                                 CreateBoldUnderlineRun("Return: "),
-                                CreateNormalRun($"{method.ReturnType}")
+                                CreateNormalRun($" {method.ReturnType}")
                             );
 
                             if (!string.IsNullOrWhiteSpace(method.Summary))
@@ -661,13 +676,13 @@ namespace Sep490ClassDocumentGenerator
                                 descParagraph.Append(
                                     new Break(),
                                     CreateBoldUnderlineRun("Description: "),
-                                    CreateNormalRun(method.Summary)
+                                    CreateNormalRun(" " + method.Summary)
                                 );
                             }
 
                             descParagraph.Append(
                                 new Break(),
-                                CreateBoldUnderlineRun("Parameters: ")
+                                CreateBoldUnderlineRun("Parameters:")
                             );
 
                             if (method.Parameters.Any())

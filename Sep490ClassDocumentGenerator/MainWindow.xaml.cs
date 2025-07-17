@@ -180,6 +180,10 @@ namespace Sep490ClassDocumentGenerator
                 {
                     ProcessClass(classDecl, ns.Name.ToString(), classInfos, null);
                 }
+                foreach (var interfaceDecl in ns.Members.OfType<InterfaceDeclarationSyntax>())
+                {
+                    ProcessInterface(interfaceDecl, ns.Name.ToString(), classInfos, null);
+                }
             }
         }
         
@@ -230,6 +234,56 @@ namespace Sep490ClassDocumentGenerator
                 ProcessClass(nestedClass, namespaceName, classInfos, fullClassName);
             }
         }
+        
+        private void ProcessInterface(InterfaceDeclarationSyntax interfaceDecl, string namespaceName, List<ClassInfo> classInfos, string parentInterface)
+        {
+            string fullInterfaceName = parentInterface == null ? interfaceDecl.Identifier.Text : $"{parentInterface}.{interfaceDecl.Identifier.Text}";
+
+            var interfaceInfo = new ClassInfo
+            {
+                ClassName = fullInterfaceName,
+                Namespace = namespaceName,
+                IsInterface = true
+            };
+            
+            foreach (var prop in interfaceDecl.Members.OfType<PropertyDeclarationSyntax>())
+            {
+                interfaceInfo.Attributes.Add(new ClassMember
+                {
+                    Name = prop.Identifier.Text,
+                    Type = prop.Type.ToString(),
+                    Visibility = "public", // Interface properties mặc định là public
+                    Purpose = ""
+                });
+            }
+
+            foreach (var method in interfaceDecl.Members.OfType<MethodDeclarationSyntax>())
+            {
+                interfaceInfo.Methods.Add(new MethodMember
+                {
+                    Name = method.Identifier.Text,
+                    ReturnType = method.ReturnType.ToString(),
+                    Visibility = "public", // Interface methods mặc định là public
+                    Purpose = "",
+                    Parameters = method.ParameterList.Parameters
+                        .Select(p => new ParameterInfo
+                        {
+                            Name = p.Identifier.Text,
+                            Type = p.Type?.ToString() ?? "",
+                            Description = ""
+                        }).ToList()
+                });
+            }
+
+            classInfos.Add(interfaceInfo);
+
+            // Xử lý interface lồng nhau nếu có
+            foreach (var nestedInterface in interfaceDecl.Members.OfType<InterfaceDeclarationSyntax>())
+            {
+                ProcessInterface(nestedInterface, namespaceName, classInfos, fullInterfaceName);
+            }
+        }
+
 
 
 
@@ -699,6 +753,7 @@ namespace Sep490ClassDocumentGenerator
     {
         public string ClassName { get; set; }
         public string Namespace { get; set; }
+        public bool IsInterface { get; set; } = false;
         public List<ClassMember> Attributes { get; set; } = new List<ClassMember>();
         public List<MethodMember> Methods { get; set; } = new List<MethodMember>();
     }

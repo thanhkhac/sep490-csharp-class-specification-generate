@@ -416,6 +416,15 @@ namespace Sep490ClassDocumentGenerator
                         body.AppendChild(classPara);
 
                         var table = new Table();
+                        
+                        var tableGrid = new TableGrid(
+                            new GridColumn() { Width = "1000" },   // khoảng 10% (OpenXML dùng đơn vị twentieth of a point)
+                            new GridColumn() { Width = "3000" },
+                            new GridColumn() { Width = "6000" }
+                        );
+                        
+                        table.AppendChild(tableGrid);
+
                         var tableProps = new TableProperties(
                             new TableWidth()
                             {
@@ -424,7 +433,7 @@ namespace Sep490ClassDocumentGenerator
                             },
                             new TableLayout()
                             {
-                                Type = TableLayoutValues.Autofit
+                                Type = TableLayoutValues.Fixed 
                             },
                             new TableBorders(
                                 new TopBorder
@@ -1057,9 +1066,6 @@ namespace Sep490ClassDocumentGenerator
 
             var window = new IgnoreEditorWindow(_ignoreManager);
             window.ShowDialog();
-
-            // Reload tree in case rules changed
-            LoadFileSystem(FolderPathTextBox.Text);
         }
         
         private void AddToIgnore_Click(object sender, RoutedEventArgs e)

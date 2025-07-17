@@ -2,6 +2,7 @@
 using System.ComponentModel;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
@@ -13,15 +14,11 @@ using Style = DocumentFormat.OpenXml.Wordprocessing.Style;
 
 namespace Sep490ClassDocumentGenerator
 {
-    /// <summary>
-    /// Đây là description của class
-    /// </summary>
     public partial class MainWindow : Window
     {
-        /// <summary>
-        /// Đây là description của attribute
-        /// </summary>
         private ObservableCollection<FileSystemNode> _fileSystemNodes;
+        private IgnoreManager? _ignoreManager;
+        private string _rootFolder;
 
         public MainWindow()
         {
@@ -30,12 +27,6 @@ namespace Sep490ClassDocumentGenerator
             FileTreeView.ItemsSource = _fileSystemNodes;
         }
 
-        // Select source folder using WPF's OpenFolderDialog (.NET 8+)
-        /// <summary>
-        /// Đây là description của method
-        /// </summary>
-        /// <param name="sender">Description của sender</param>
-        /// <param name="e">Description của e</param>
         private void SelectFolderButton_Click(object sender, RoutedEventArgs e)
         {
             var dialog = new OpenFolderDialog
@@ -46,6 +37,7 @@ namespace Sep490ClassDocumentGenerator
 
             if (dialog.ShowDialog() == true)
             {
+                _rootFolder = dialog.FolderName;
                 FolderPathTextBox.Text = dialog.FolderName;
                 LoadFileSystem(dialog.FolderName);
             }
@@ -68,7 +60,7 @@ namespace Sep490ClassDocumentGenerator
         private void LoadFileSystem(string path)
         {
             _fileSystemNodes.Clear();
-
+            _ignoreManager = new IgnoreManager(path);
             if (Directory.Exists(path))
             {
                 var rootNode = new FileSystemNode(path, true);
@@ -81,30 +73,37 @@ namespace Sep490ClassDocumentGenerator
                     "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+        
+       
+        
 
         // Populate TreeView nodes
         private void PopulateNode(FileSystemNode node, string path)
         {
             try
             {
-                // Add subdirectories
                 foreach (var dir in Directory.GetDirectories(path))
                 {
-                    if (!dir.Contains("\\bin\\") && !dir.Contains("\\obj\\"))
-                    {
-                        var dirNode = new FileSystemNode(dir, true);
-                        node.Children.Add(dirNode);
-                        PopulateNode(dirNode, dir);
-                    }
+                    var relativeDir = Path.GetRelativePath(FolderPathTextBox.Text, dir).Replace('\\', '/');
+                    if (_ignoreManager?.IsIgnored(relativeDir) == true) continue;
+
+                    var dirNode = new FileSystemNode(dir, true);
+                    node.Children.Add(dirNode);
+                    PopulateNode(dirNode, dir);
                 }
 
-                // Add .cs files
                 foreach (var file in Directory.GetFiles(path, "*.cs"))
                 {
-                    if (!file.Contains("\\bin\\") && !file.Contains("\\obj\\")) { node.Children.Add(new FileSystemNode(file, false)); }
+                    var relativeFile = Path.GetRelativePath(FolderPathTextBox.Text, file).Replace('\\', '/');
+                    if (_ignoreManager?.IsIgnored(relativeFile) == true) continue;
+
+                    node.Children.Add(new FileSystemNode(file, false));
                 }
             }
-            catch (Exception ex) { MessageBox.Show($"Error loading directory: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error); }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading directory: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         // Generate document
@@ -262,57 +261,6 @@ namespace Sep490ClassDocumentGenerator
 
             // ✅ Nested classes/interfaces
             foreach (var nested in members.OfType<TypeDeclarationSyntax>()) { ProcessClassOrInterface(nested, namespaceName, classInfos, fullClassName); }
-        }
-
-        private void ProcessClass(ClassDeclarationSyntax classDecl, string namespaceName, List<ClassInfo> classInfos, string parentClass)
-        {
-            string fullClassName = parentClass == null ? classDecl.Identifier.Text : $"{parentClass}.{classDecl.Identifier.Text}";
-
-            var classInfo = new ClassInfo
-            {
-                ClassName = fullClassName,
-                Namespace = namespaceName
-            };
-
-            var members = classDecl.Members;
-
-            foreach (var prop in members.OfType<PropertyDeclarationSyntax>())
-            {
-                classInfo.Attributes.Add(new ClassMember
-                {
-                    Name = prop.Identifier.Text,
-                    Type = prop.Type.ToString(),
-                    Visibility = GetVisibility(prop.Modifiers),
-                    Summary = GetXmlSummary(prop)
-                });
-            }
-
-            foreach (var method in members.OfType<MethodDeclarationSyntax>())
-            {
-                var paramDescriptions = GetXmlParamDescriptions(method);
-
-                classInfo.Methods.Add(new MethodMember
-                {
-                    Name = method.Identifier.Text,
-                    ReturnType = method.ReturnType.ToString(),
-                    Visibility = GetVisibility(method.Modifiers),
-                    Summary = GetXmlSummary(method),
-                    Parameters = method.ParameterList.Parameters.Select(p => new ParameterInfo
-                    {
-                        Name = p.Identifier.Text,
-                        Type = p.Type.ToString(),
-                        Summary = paramDescriptions.TryGetValue(p.Identifier.Text, out var desc) ? desc : ""
-                    }).ToList()
-                });
-            }
-
-            classInfos.Add(classInfo);
-
-            // 🔁 Xử lý class lồng trong class hiện tại
-            foreach (var nestedClass in classDecl.Members.OfType<ClassDeclarationSyntax>())
-            {
-                ProcessClass(nestedClass, namespaceName, classInfos, fullClassName);
-            }
         }
 
         private string GetXmlSummary(MemberDeclarationSyntax member)
@@ -1099,6 +1047,53 @@ namespace Sep490ClassDocumentGenerator
 
             return cell;
         }
+        private void ManageIgnoreButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_ignoreManager == null)
+            {
+                MessageBox.Show("Please select a folder first.", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var window = new IgnoreEditorWindow(_ignoreManager);
+            window.ShowDialog();
+
+            // Reload tree in case rules changed
+            LoadFileSystem(FolderPathTextBox.Text);
+        }
+        
+        private void AddToIgnore_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuItem menuItem && menuItem.Tag is FileSystemNode node)
+            {
+                var relativePath = Path.GetRelativePath(_rootFolder, node.Path).Replace('\\', '/');
+        
+                // Đơn giản chỉ dùng relativePath cho cả file và folder
+                string pattern = relativePath;
+        
+                _ignoreManager?.AddRule(pattern);
+                _ignoreManager?.SaveRules();
+        
+                MessageBox.Show($"Added '{pattern}' to ignore list.", "Success", 
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+        
+                // Refresh the tree view
+                // LoadFileSystem(_rootFolder);
+            }
+        }
+        
+        private void RefreshNode_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuItem menuItem && menuItem.DataContext is FileSystemNode clickedNode)
+            {
+                clickedNode.Children.Clear();
+                PopulateNode(clickedNode, clickedNode.Path);
+            }
+        }
+
+
+        
+
     }
 
     // Model for TreeView nodes

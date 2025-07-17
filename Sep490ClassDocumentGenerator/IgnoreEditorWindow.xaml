@@ -1,0 +1,27 @@
+﻿<Window x:Class="Sep490ClassDocumentGenerator.IgnoreEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:local="clr-namespace:Sep490ClassDocumentGenerator"
+        mc:Ignorable="d"
+        Title="IgnoreEditorWindow" Height="450" Width="800">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <TextBox x:Name="NewRuleTextBox" Width="300" Margin="0,0,5,0"/>
+        <Button Content="Add" Click="Add_Click" Width="80" HorizontalAlignment="Right"/>
+        
+        <ListBox x:Name="IgnoreListBox" Grid.Row="1" Margin="0,10" />
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Edit" Click="Edit_Click" Width="80" Margin="0,0,5,0"/>
+            <Button Content="Delete" Click="Delete_Click" Width="80" Margin="0,0,5,0"/>
+            <Button Content="Close" Click="Close_Click" Width="80"/>
+        </StackPanel>
+    </Grid>
+</Window>

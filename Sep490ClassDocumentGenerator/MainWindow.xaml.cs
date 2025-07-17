@@ -174,6 +174,11 @@ namespace Sep490ClassDocumentGenerator
                     ProcessClassOrInterface(typeDecl, ns.Name.ToString(), classInfos, null);
                 }
             }
+            
+            foreach (var typeDecl in root.Members.OfType<TypeDeclarationSyntax>())
+            {
+                ProcessClassOrInterface(typeDecl, "Global", classInfos, null);
+            }
         }
 
         private void ProcessClassOrInterface(TypeDeclarationSyntax decl, string namespaceName, List<ClassInfo> classInfos, string parentClass)
@@ -672,10 +677,10 @@ namespace Sep490ClassDocumentGenerator
                                 {
                                     var summary = string.IsNullOrWhiteSpace(param.Summary)
                                         ? ""
-                                        : $" - {param.Summary}";
+                                        : $", {param.Summary}";
 
                                     descParagraph.Append(
-                                        CreateNormalRun($"- {param.Name}: {param.Type}, {summary}"),
+                                        CreateNormalRun($"- {param.Name}: {param.Type}{summary}"),
                                         new Break()
                                     );
                                 }

@@ -50,17 +50,14 @@ namespace Sep490ClassDocumentGenerator
                 DefaultExt = "docx"
             };
 
-            if (dialog.ShowDialog() == true)
-            {
-                OutputFileTextBox.Text = dialog.FileName;
-            }
+            if (dialog.ShowDialog() == true) { OutputFileTextBox.Text = dialog.FileName; }
         }
 
         // Load folder structure into TreeView
         private void LoadFileSystem(string path)
         {
             _fileSystemNodes.Clear();
-            
+
             if (Directory.Exists(path))
             {
                 var rootNode = new FileSystemNode(path, true);
@@ -69,7 +66,7 @@ namespace Sep490ClassDocumentGenerator
             }
             else
             {
-                MessageBox.Show("Selected path does not exist or is not accessible.", 
+                MessageBox.Show("Selected path does not exist or is not accessible.",
                     "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -93,16 +90,10 @@ namespace Sep490ClassDocumentGenerator
                 // Add .cs files
                 foreach (var file in Directory.GetFiles(path, "*.cs"))
                 {
-                    if (!file.Contains("\\bin\\") && !file.Contains("\\obj\\"))
-                    {
-                        node.Children.Add(new FileSystemNode(file, false));
-                    }
+                    if (!file.Contains("\\bin\\") && !file.Contains("\\obj\\")) { node.Children.Add(new FileSystemNode(file, false)); }
                 }
             }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error loading directory: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            catch (Exception ex) { MessageBox.Show($"Error loading directory: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error); }
         }
 
         // Generate document
@@ -123,7 +114,7 @@ namespace Sep490ClassDocumentGenerator
             // Validate starting index
             if (!int.TryParse(StartIndexTextBox.Text, out int startIndex) || startIndex < 1)
             {
-                MessageBox.Show("Please enter a valid positive integer for the starting index.", 
+                MessageBox.Show("Please enter a valid positive integer for the starting index.",
                     "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -138,17 +129,11 @@ namespace Sep490ClassDocumentGenerator
             try
             {
                 var classInfos = new List<ClassInfo>();
-                foreach (var file in selectedFiles)
-                {
-                    ProcessFile(file, classInfos);
-                }
+                foreach (var file in selectedFiles) { ProcessFile(file, classInfos); }
                 CreateWordDoc(classInfos, OutputFileTextBox.Text, startIndex);
                 MessageBox.Show("Document generated successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
             }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error generating document: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            catch (Exception ex) { MessageBox.Show($"Error generating document: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error); }
         }
 
         // Get selected .cs files
@@ -157,10 +142,7 @@ namespace Sep490ClassDocumentGenerator
             var files = new List<string>();
             foreach (var node in nodes)
             {
-                if (node.IsSelected && !node.IsDirectory && node.Path.EndsWith(".cs"))
-                {
-                    files.Add(node.Path);
-                }
+                if (node.IsSelected && !node.IsDirectory && node.Path.EndsWith(".cs")) { files.Add(node.Path); }
                 files.AddRange(GetSelectedFiles(node.Children));
             }
             return files;
@@ -176,17 +158,65 @@ namespace Sep490ClassDocumentGenerator
             var namespaces = root.DescendantNodes().OfType<BaseNamespaceDeclarationSyntax>();
             foreach (var ns in namespaces)
             {
-                foreach (var classDecl in ns.Members.OfType<ClassDeclarationSyntax>())
+                foreach (var typeDecl in ns.Members.OfType<TypeDeclarationSyntax>())
                 {
-                    ProcessClass(classDecl, ns.Name.ToString(), classInfos, null);
-                }
-                foreach (var interfaceDecl in ns.Members.OfType<InterfaceDeclarationSyntax>())
-                {
-                    ProcessInterface(interfaceDecl, ns.Name.ToString(), classInfos, null);
+                    ProcessClassOrInterface(typeDecl, ns.Name.ToString(), classInfos, null);
                 }
             }
         }
-        
+
+        private void ProcessClassOrInterface(TypeDeclarationSyntax decl, string namespaceName, List<ClassInfo> classInfos, string parentClass)
+        {
+            string fullClassName = parentClass == null ? decl.Identifier.Text : $"{parentClass}.{decl.Identifier.Text}";
+
+            var classInfo = new ClassInfo
+            {
+                ClassName = fullClassName,
+                Namespace = namespaceName,
+                Summary = GetXmlSummary(decl)
+            };
+
+            var members = decl.Members;
+            bool isInInterface = decl is InterfaceDeclarationSyntax;
+
+            // ✅ Properties
+            foreach (var prop in members.OfType<PropertyDeclarationSyntax>())
+            {
+                classInfo.Attributes.Add(new ClassMember
+                {
+                    Name = prop.Identifier.Text,
+                    Type = prop.Type.ToString(),
+                    Visibility = GetVisibility(prop.Modifiers, isInInterface),
+                    Summary = GetXmlSummary(prop)
+                });
+            }
+
+            // ✅ Methods
+            foreach (var method in members.OfType<MethodDeclarationSyntax>())
+            {
+                var paramDescriptions = GetXmlParamDescriptions(method);
+
+                classInfo.Methods.Add(new MethodMember
+                {
+                    Name = method.Identifier.Text,
+                    ReturnType = method.ReturnType.ToString(),
+                    Visibility = GetVisibility(method.Modifiers, isInInterface),
+                    Summary = GetXmlSummary(method),
+                    Parameters = method.ParameterList.Parameters.Select(p => new ParameterInfo
+                    {
+                        Name = p.Identifier.Text,
+                        Type = p.Type?.ToString() ?? "",
+                        Summary = paramDescriptions.TryGetValue(p.Identifier.Text, out var desc) ? desc : ""
+                    }).ToList()
+                });
+            }
+
+            classInfos.Add(classInfo);
+
+            // ✅ Nested classes/interfaces
+            foreach (var nested in members.OfType<TypeDeclarationSyntax>()) { ProcessClassOrInterface(nested, namespaceName, classInfos, fullClassName); }
+        }
+
         private void ProcessClass(ClassDeclarationSyntax classDecl, string namespaceName, List<ClassInfo> classInfos, string parentClass)
         {
             string fullClassName = parentClass == null ? classDecl.Identifier.Text : $"{parentClass}.{classDecl.Identifier.Text}";
@@ -237,7 +267,7 @@ namespace Sep490ClassDocumentGenerator
                 ProcessClass(nestedClass, namespaceName, classInfos, fullClassName);
             }
         }
-        
+
         private string GetXmlSummary(MemberDeclarationSyntax member)
         {
             var trivia = member.GetLeadingTrivia()
@@ -252,7 +282,7 @@ namespace Sep490ClassDocumentGenerator
 
             return summaryElement?.Content.ToString().Trim().Replace("///", "").Trim() ?? "";
         }
-        
+
         private Dictionary<string, string> GetXmlParamDescriptions(MemberDeclarationSyntax member)
         {
             var result = new Dictionary<string, string>();
@@ -285,7 +315,6 @@ namespace Sep490ClassDocumentGenerator
         }
 
 
-        
         private void ProcessInterface(InterfaceDeclarationSyntax interfaceDecl, string namespaceName, List<ClassInfo> classInfos, string parentInterface)
         {
             string fullInterfaceName = parentInterface == null ? interfaceDecl.Identifier.Text : $"{parentInterface}.{interfaceDecl.Identifier.Text}";
@@ -296,7 +325,7 @@ namespace Sep490ClassDocumentGenerator
                 Namespace = namespaceName,
                 IsInterface = true
             };
-            
+
             foreach (var prop in interfaceDecl.Members.OfType<PropertyDeclarationSyntax>())
             {
                 interfaceInfo.Attributes.Add(new ClassMember
@@ -336,23 +365,18 @@ namespace Sep490ClassDocumentGenerator
         }
 
 
-
-
         // Original GetVisibility method
-        private string GetVisibility(SyntaxTokenList modifiers)
+        string GetVisibility(SyntaxTokenList modifiers, bool isInInterface = false)
         {
-            if (modifiers.Any(m => m.IsKind(SyntaxKind.PublicKeyword)))
-                return "public";
-            if (modifiers.Any(m => m.IsKind(SyntaxKind.PrivateKeyword)))
-                return "private";
-            if (modifiers.Any(m => m.IsKind(SyntaxKind.ProtectedKeyword)))
-                return "protected";
-            if (modifiers.Any(m => m.IsKind(SyntaxKind.InternalKeyword)))
-                return "internal";
-            return "private"; // default in C#
+            if (isInInterface) return "public";
+
+            if (modifiers.Any(SyntaxKind.PublicKeyword)) return "public";
+            if (modifiers.Any(SyntaxKind.PrivateKeyword)) return "private";
+            if (modifiers.Any(SyntaxKind.ProtectedKeyword)) return "protected";
+            if (modifiers.Any(SyntaxKind.InternalKeyword)) return "internal";
+            return "private"; // fallback
         }
-        
-        
+
 
         // Modified CreateWordDoc to use custom startIndex
         private void CreateWordDoc(List<ClassInfo> classes, string filePath, int startIndex)
@@ -367,7 +391,10 @@ namespace Sep490ClassDocumentGenerator
 
                 // Use custom startIndex for the main title
                 var titlePara = new Paragraph(new Run(new Text($"{startIndex}. Class Specifications")));
-                titlePara.ParagraphProperties = new ParagraphProperties(new ParagraphStyleId() { Val = "Heading1" });
+                titlePara.ParagraphProperties = new ParagraphProperties(new ParagraphStyleId()
+                {
+                    Val = "Heading1"
+                });
                 body.AppendChild(titlePara);
 
                 var groupedClasses = classes.GroupBy(c => c.Namespace);
@@ -376,7 +403,10 @@ namespace Sep490ClassDocumentGenerator
                 {
                     string displayNamespace = string.Join("/", namespaceGroup.Key.Split('.').Skip(1));
                     var namespacePara = new Paragraph(new Run(new Text($"{startIndex}.{sectionIndex} {displayNamespace}")));
-                    namespacePara.ParagraphProperties = new ParagraphProperties(new ParagraphStyleId() { Val = "Heading2" });
+                    namespacePara.ParagraphProperties = new ParagraphProperties(new ParagraphStyleId()
+                    {
+                        Val = "Heading2"
+                    });
                     body.AppendChild(namespacePara);
 
                     int classIndex = 1;
@@ -384,20 +414,54 @@ namespace Sep490ClassDocumentGenerator
                     {
                         // Use custom startIndex for class subsections
                         var classPara = new Paragraph(new Run(new Text($"{startIndex}.{sectionIndex}.{classIndex} {classInfo.ClassName}")));
-                        classPara.ParagraphProperties = new ParagraphProperties(new ParagraphStyleId() { Val = "Heading3" });
+                        classPara.ParagraphProperties = new ParagraphProperties(new ParagraphStyleId()
+                        {
+                            Val = "Heading3"
+                        });
                         body.AppendChild(classPara);
 
                         var table = new Table();
                         var tableProps = new TableProperties(
-                            new TableWidth() { Width = "5000", Type = TableWidthUnitValues.Pct },
-                            new TableLayout() { Type = TableLayoutValues.Autofit },
+                            new TableWidth()
+                            {
+                                Width = "5000",
+                                Type = TableWidthUnitValues.Pct
+                            },
+                            new TableLayout()
+                            {
+                                Type = TableLayoutValues.Autofit
+                            },
                             new TableBorders(
-                                new TopBorder { Val = new EnumValue<BorderValues>(BorderValues.Single), Size = 12 },
-                                new BottomBorder { Val = new EnumValue<BorderValues>(BorderValues.Single), Size = 12 },
-                                new LeftBorder { Val = new EnumValue<BorderValues>(BorderValues.Single), Size = 12 },
-                                new RightBorder { Val = new EnumValue<BorderValues>(BorderValues.Single), Size = 12 },
-                                new InsideHorizontalBorder { Val = new EnumValue<BorderValues>(BorderValues.Single), Size = 12 },
-                                new InsideVerticalBorder { Val = new EnumValue<BorderValues>(BorderValues.Single), Size = 12 }
+                                new TopBorder
+                                {
+                                    Val = new EnumValue<BorderValues>(BorderValues.Single),
+                                    Size = 12
+                                },
+                                new BottomBorder
+                                {
+                                    Val = new EnumValue<BorderValues>(BorderValues.Single),
+                                    Size = 12
+                                },
+                                new LeftBorder
+                                {
+                                    Val = new EnumValue<BorderValues>(BorderValues.Single),
+                                    Size = 12
+                                },
+                                new RightBorder
+                                {
+                                    Val = new EnumValue<BorderValues>(BorderValues.Single),
+                                    Size = 12
+                                },
+                                new InsideHorizontalBorder
+                                {
+                                    Val = new EnumValue<BorderValues>(BorderValues.Single),
+                                    Size = 12
+                                },
+                                new InsideVerticalBorder
+                                {
+                                    Val = new EnumValue<BorderValues>(BorderValues.Single),
+                                    Size = 12
+                                }
                             )
                         );
                         table.AppendChild(tableProps);
@@ -412,17 +476,44 @@ namespace Sep490ClassDocumentGenerator
                         attributesHeaderRow.AppendChild(
                             new TableCell(
                                 new TableCellProperties(
-                                    new GridSpan() { Val = 3 },
-                                    new Shading { Val = ShadingPatternValues.Clear, Color = "auto", Fill = "FFE8E1" },
+                                    new GridSpan()
+                                    {
+                                        Val = 3
+                                    },
+                                    new Shading
+                                    {
+                                        Val = ShadingPatternValues.Clear,
+                                        Color = "auto",
+                                        Fill = "FFE8E1"
+                                    },
                                     new TableCellMargin(
-                                        new LeftMargin() { Width = "100", Type = TableWidthUnitValues.Dxa },
-                                        new RightMargin() { Width = "100", Type = TableWidthUnitValues.Dxa },
-                                        new TopMargin() { Width = "50", Type = TableWidthUnitValues.Dxa },
-                                        new BottomMargin() { Width = "50", Type = TableWidthUnitValues.Dxa }
+                                        new LeftMargin()
+                                        {
+                                            Width = "100",
+                                            Type = TableWidthUnitValues.Dxa
+                                        },
+                                        new RightMargin()
+                                        {
+                                            Width = "100",
+                                            Type = TableWidthUnitValues.Dxa
+                                        },
+                                        new TopMargin()
+                                        {
+                                            Width = "50",
+                                            Type = TableWidthUnitValues.Dxa
+                                        },
+                                        new BottomMargin()
+                                        {
+                                            Width = "50",
+                                            Type = TableWidthUnitValues.Dxa
+                                        }
                                     )
                                 ),
                                 new Paragraph(
-                                    new ParagraphProperties(new Justification() { Val = JustificationValues.Left }),
+                                    new ParagraphProperties(new Justification()
+                                    {
+                                        Val = JustificationValues.Left
+                                    }),
                                     new Run(new RunProperties(new Bold()), new Text("Attributes"))
                                 )
                             )
@@ -448,10 +539,26 @@ namespace Sep490ClassDocumentGenerator
                             var descCell = new TableCell(descParagraph);
                             descCell.TableCellProperties = new TableCellProperties(
                                 new TableCellMargin(
-                                    new LeftMargin() { Width = "100", Type = TableWidthUnitValues.Dxa },
-                                    new RightMargin() { Width = "100", Type = TableWidthUnitValues.Dxa },
-                                    new TopMargin() { Width = "50", Type = TableWidthUnitValues.Dxa },
-                                    new BottomMargin() { Width = "50", Type = TableWidthUnitValues.Dxa }
+                                    new LeftMargin()
+                                    {
+                                        Width = "100",
+                                        Type = TableWidthUnitValues.Dxa
+                                    },
+                                    new RightMargin()
+                                    {
+                                        Width = "100",
+                                        Type = TableWidthUnitValues.Dxa
+                                    },
+                                    new TopMargin()
+                                    {
+                                        Width = "50",
+                                        Type = TableWidthUnitValues.Dxa
+                                    },
+                                    new BottomMargin()
+                                    {
+                                        Width = "50",
+                                        Type = TableWidthUnitValues.Dxa
+                                    }
                                 )
                             );
                             attrRow.AppendChild(descCell);
@@ -464,17 +571,44 @@ namespace Sep490ClassDocumentGenerator
                         descriptionHeaderRow.AppendChild(
                             new TableCell(
                                 new TableCellProperties(
-                                    new GridSpan() { Val = 3 },
-                                    new Shading { Val = ShadingPatternValues.Clear, Color = "auto", Fill = "FFE8E1" },
+                                    new GridSpan()
+                                    {
+                                        Val = 3
+                                    },
+                                    new Shading
+                                    {
+                                        Val = ShadingPatternValues.Clear,
+                                        Color = "auto",
+                                        Fill = "FFE8E1"
+                                    },
                                     new TableCellMargin(
-                                        new LeftMargin() { Width = "100", Type = TableWidthUnitValues.Dxa },
-                                        new RightMargin() { Width = "100", Type = TableWidthUnitValues.Dxa },
-                                        new TopMargin() { Width = "50", Type = TableWidthUnitValues.Dxa },
-                                        new BottomMargin() { Width = "50", Type = TableWidthUnitValues.Dxa }
+                                        new LeftMargin()
+                                        {
+                                            Width = "100",
+                                            Type = TableWidthUnitValues.Dxa
+                                        },
+                                        new RightMargin()
+                                        {
+                                            Width = "100",
+                                            Type = TableWidthUnitValues.Dxa
+                                        },
+                                        new TopMargin()
+                                        {
+                                            Width = "50",
+                                            Type = TableWidthUnitValues.Dxa
+                                        },
+                                        new BottomMargin()
+                                        {
+                                            Width = "50",
+                                            Type = TableWidthUnitValues.Dxa
+                                        }
                                     )
                                 ),
                                 new Paragraph(
-                                    new ParagraphProperties(new Justification() { Val = JustificationValues.Left }),
+                                    new ParagraphProperties(new Justification()
+                                    {
+                                        Val = JustificationValues.Left
+                                    }),
                                     new Run(new RunProperties(new Bold()), new Text("Methods/Operations"))
                                 )
                             )
@@ -513,18 +647,31 @@ namespace Sep490ClassDocumentGenerator
                                     );
                                 }
                             }
-                            else
-                            {
-                                descParagraph.Append(CreateNormalRun("None"));
-                            }
+                            else { descParagraph.Append(CreateNormalRun("None")); }
 
                             var descCell = new TableCell(descParagraph);
                             descCell.TableCellProperties = new TableCellProperties(
                                 new TableCellMargin(
-                                    new LeftMargin() { Width = "100", Type = TableWidthUnitValues.Dxa },
-                                    new RightMargin() { Width = "100", Type = TableWidthUnitValues.Dxa },
-                                    new TopMargin() { Width = "50", Type = TableWidthUnitValues.Dxa },
-                                    new BottomMargin() { Width = "50", Type = TableWidthUnitValues.Dxa }
+                                    new LeftMargin()
+                                    {
+                                        Width = "100",
+                                        Type = TableWidthUnitValues.Dxa
+                                    },
+                                    new RightMargin()
+                                    {
+                                        Width = "100",
+                                        Type = TableWidthUnitValues.Dxa
+                                    },
+                                    new TopMargin()
+                                    {
+                                        Width = "50",
+                                        Type = TableWidthUnitValues.Dxa
+                                    },
+                                    new BottomMargin()
+                                    {
+                                        Width = "50",
+                                        Type = TableWidthUnitValues.Dxa
+                                    }
                                 )
                             );
                             methodRow.AppendChild(descCell);
@@ -571,18 +718,40 @@ namespace Sep490ClassDocumentGenerator
                 {
                     Type = StyleValues.Paragraph,
                     StyleId = "Heading1",
-                    BasedOn = new BasedOn() { Val = "Normal" },
-                    NextParagraphStyle = new NextParagraphStyle() { Val = "Normal" },
+                    BasedOn = new BasedOn()
+                    {
+                        Val = "Normal"
+                    },
+                    NextParagraphStyle = new NextParagraphStyle()
+                    {
+                        Val = "Normal"
+                    },
                     PrimaryStyle = new PrimaryStyle(),
-                    StyleName = new StyleName() { Val = "heading 1" },
+                    StyleName = new StyleName()
+                    {
+                        Val = "heading 1"
+                    },
                     StyleRunProperties = new StyleRunProperties(
                         new Bold(),
-                        new FontSize() { Val = "32" },
-                        new RunFonts() { Ascii = "Times New Roman", HighAnsi = "Times New Roman" }
+                        new FontSize()
+                        {
+                            Val = "32"
+                        },
+                        new RunFonts()
+                        {
+                            Ascii = "Times New Roman",
+                            HighAnsi = "Times New Roman"
+                        }
                     ),
                     StyleParagraphProperties = new StyleParagraphProperties(
-                        new OutlineLevel() { Val = 0 },
-                        new SpacingBetweenLines() { After = "200" },
+                        new OutlineLevel()
+                        {
+                            Val = 0
+                        },
+                        new SpacingBetweenLines()
+                        {
+                            After = "200"
+                        },
                         new KeepNext()
                     )
                 },
@@ -590,18 +759,40 @@ namespace Sep490ClassDocumentGenerator
                 {
                     Type = StyleValues.Paragraph,
                     StyleId = "Heading2",
-                    BasedOn = new BasedOn() { Val = "Normal" },
-                    NextParagraphStyle = new NextParagraphStyle() { Val = "Normal" },
+                    BasedOn = new BasedOn()
+                    {
+                        Val = "Normal"
+                    },
+                    NextParagraphStyle = new NextParagraphStyle()
+                    {
+                        Val = "Normal"
+                    },
                     PrimaryStyle = new PrimaryStyle(),
-                    StyleName = new StyleName() { Val = "heading 2" },
+                    StyleName = new StyleName()
+                    {
+                        Val = "heading 2"
+                    },
                     StyleRunProperties = new StyleRunProperties(
                         new Bold(),
-                        new FontSize() { Val = "28" },
-                        new RunFonts() { Ascii = "Times New Roman", HighAnsi = "Times New Roman" }
+                        new FontSize()
+                        {
+                            Val = "28"
+                        },
+                        new RunFonts()
+                        {
+                            Ascii = "Times New Roman",
+                            HighAnsi = "Times New Roman"
+                        }
                     ),
                     StyleParagraphProperties = new StyleParagraphProperties(
-                        new OutlineLevel() { Val = 1 },
-                        new SpacingBetweenLines() { After = "180" },
+                        new OutlineLevel()
+                        {
+                            Val = 1
+                        },
+                        new SpacingBetweenLines()
+                        {
+                            After = "180"
+                        },
                         new KeepNext()
                     )
                 },
@@ -609,18 +800,40 @@ namespace Sep490ClassDocumentGenerator
                 {
                     Type = StyleValues.Paragraph,
                     StyleId = "Heading3",
-                    BasedOn = new BasedOn() { Val = "Normal" },
-                    NextParagraphStyle = new NextParagraphStyle() { Val = "Normal" },
+                    BasedOn = new BasedOn()
+                    {
+                        Val = "Normal"
+                    },
+                    NextParagraphStyle = new NextParagraphStyle()
+                    {
+                        Val = "Normal"
+                    },
                     PrimaryStyle = new PrimaryStyle(),
-                    StyleName = new StyleName() { Val = "heading 3" },
+                    StyleName = new StyleName()
+                    {
+                        Val = "heading 3"
+                    },
                     StyleRunProperties = new StyleRunProperties(
                         new Bold(),
-                        new FontSize() { Val = "26" },
-                        new RunFonts() { Ascii = "Times New Roman", HighAnsi = "Times New Roman" }
+                        new FontSize()
+                        {
+                            Val = "26"
+                        },
+                        new RunFonts()
+                        {
+                            Ascii = "Times New Roman",
+                            HighAnsi = "Times New Roman"
+                        }
                     ),
                     StyleParagraphProperties = new StyleParagraphProperties(
-                        new OutlineLevel() { Val = 2 },
-                        new SpacingBetweenLines() { After = "160" },
+                        new OutlineLevel()
+                        {
+                            Val = 2
+                        },
+                        new SpacingBetweenLines()
+                        {
+                            After = "160"
+                        },
                         new KeepNext()
                     )
                 },
@@ -629,13 +842,26 @@ namespace Sep490ClassDocumentGenerator
                     Type = StyleValues.Paragraph,
                     StyleId = "Normal",
                     Default = OnOffValue.FromBoolean(true),
-                    StyleName = new StyleName() { Val = "Normal" },
+                    StyleName = new StyleName()
+                    {
+                        Val = "Normal"
+                    },
                     StyleRunProperties = new StyleRunProperties(
-                        new FontSize() { Val = "24" },
-                        new RunFonts() { Ascii = "Times New Roman", HighAnsi = "Times New Roman" }
+                        new FontSize()
+                        {
+                            Val = "24"
+                        },
+                        new RunFonts()
+                        {
+                            Ascii = "Times New Roman",
+                            HighAnsi = "Times New Roman"
+                        }
                     ),
                     StyleParagraphProperties = new StyleParagraphProperties(
-                        new SpacingBetweenLines() { After = "120" }
+                        new SpacingBetweenLines()
+                        {
+                            After = "120"
+                        }
                     )
                 }
             );
@@ -647,11 +873,23 @@ namespace Sep490ClassDocumentGenerator
             return new Run(
                 new RunProperties(
                     new Bold(),
-                    new Underline() { Val = UnderlineValues.Single },
-                    new RunFonts() { Ascii = "Times New Roman" },
-                    new FontSize() { Val = "22" }
+                    new Underline()
+                    {
+                        Val = UnderlineValues.Single
+                    },
+                    new RunFonts()
+                    {
+                        Ascii = "Times New Roman"
+                    },
+                    new FontSize()
+                    {
+                        Val = "22"
+                    }
                 ),
-                new Text(text) { Space = SpaceProcessingModeValues.Preserve }
+                new Text(text)
+                {
+                    Space = SpaceProcessingModeValues.Preserve
+                }
             );
         }
 
@@ -660,10 +898,19 @@ namespace Sep490ClassDocumentGenerator
         {
             return new Run(
                 new RunProperties(
-                    new RunFonts() { Ascii = "Times New Roman" },
-                    new FontSize() { Val = "22" }
+                    new RunFonts()
+                    {
+                        Ascii = "Times New Roman"
+                    },
+                    new FontSize()
+                    {
+                        Val = "22"
+                    }
                 ),
-                new Text(text) { Space = SpaceProcessingModeValues.Preserve }
+                new Text(text)
+                {
+                    Space = SpaceProcessingModeValues.Preserve
+                }
             );
         }
 
@@ -674,10 +921,26 @@ namespace Sep490ClassDocumentGenerator
 
             var cellProps = new TableCellProperties(
                 new TableCellMargin(
-                    new LeftMargin() { Width = "100", Type = TableWidthUnitValues.Dxa },
-                    new RightMargin() { Width = "100", Type = TableWidthUnitValues.Dxa },
-                    new TopMargin() { Width = "50", Type = TableWidthUnitValues.Dxa },
-                    new BottomMargin() { Width = "50", Type = TableWidthUnitValues.Dxa }
+                    new LeftMargin()
+                    {
+                        Width = "100",
+                        Type = TableWidthUnitValues.Dxa
+                    },
+                    new RightMargin()
+                    {
+                        Width = "100",
+                        Type = TableWidthUnitValues.Dxa
+                    },
+                    new TopMargin()
+                    {
+                        Width = "50",
+                        Type = TableWidthUnitValues.Dxa
+                    },
+                    new BottomMargin()
+                    {
+                        Width = "50",
+                        Type = TableWidthUnitValues.Dxa
+                    }
                 )
             );
 
@@ -703,8 +966,14 @@ namespace Sep490ClassDocumentGenerator
                     if (i > 0) { para.AppendChild(new Break()); }
                     var run = new Run(
                         new RunProperties(
-                            new FontSize() { Val = "22" },
-                            new RunFonts() { Ascii = "Times New Roman" }
+                            new FontSize()
+                            {
+                                Val = "22"
+                            },
+                            new RunFonts()
+                            {
+                                Ascii = "Times New Roman"
+                            }
                         ),
                         new Text(lines[i])
                     );
@@ -720,10 +989,7 @@ namespace Sep490ClassDocumentGenerator
                         }
                     );
 
-                    foreach (var run in para.Elements<Run>())
-                    {
-                        run.RunProperties.Bold = new Bold();
-                    }
+                    foreach (var run in para.Elements<Run>()) { run.RunProperties.Bold = new Bold(); }
                 }
 
                 cell.Append(para);
@@ -732,8 +998,14 @@ namespace Sep490ClassDocumentGenerator
             {
                 var run = new Run(
                     new RunProperties(
-                        new FontSize() { Val = "22" },
-                        new RunFonts() { Ascii = "Times New Roman" }
+                        new FontSize()
+                        {
+                            Val = "22"
+                        },
+                        new RunFonts()
+                        {
+                            Ascii = "Times New Roman"
+                        }
                     ),
                     new Text(text)
                 );
@@ -764,7 +1036,12 @@ namespace Sep490ClassDocumentGenerator
     {
         private bool _isSelected;
         public string Path { get; set; }
-        public string Name { get => System.IO.Path.GetFileName(Path); }
+
+        public string Name
+        {
+            get => System.IO.Path.GetFileName(Path);
+        }
+
         public bool IsDirectory { get; set; }
         public ObservableCollection<FileSystemNode> Children { get; set; } = new ObservableCollection<FileSystemNode>();
 
@@ -777,10 +1054,7 @@ namespace Sep490ClassDocumentGenerator
                 OnPropertyChanged(nameof(IsSelected));
                 if (IsDirectory)
                 {
-                    foreach (var child in Children)
-                    {
-                        child.IsSelected = value;
-                    }
+                    foreach (var child in Children) { child.IsSelected = value; }
                 }
             }
         }
@@ -801,10 +1075,11 @@ namespace Sep490ClassDocumentGenerator
 
     // Original data models
     public class ClassInfo
-    {    
+    {
         public string ClassName { get; set; }
         public string Namespace { get; set; }
         public bool IsInterface { get; set; } = false;
+        public string Summary { get; set; }
         public List<ClassMember> Attributes { get; set; } = new List<ClassMember>();
         public List<MethodMember> Methods { get; set; } = new List<MethodMember>();
     }
@@ -831,6 +1106,6 @@ namespace Sep490ClassDocumentGenerator
         public string Name { get; set; }
         public string Type { get; set; }
         public string Summary { get; set; }
-    
+
     }
 }

@@ -197,32 +197,35 @@ namespace Sep490ClassDocumentGenerator
                 Namespace = namespaceName
             };
 
-            foreach (var prop in classDecl.Members.OfType<PropertyDeclarationSyntax>())
+            var members = classDecl.Members;
+
+            foreach (var prop in members.OfType<PropertyDeclarationSyntax>())
             {
                 classInfo.Attributes.Add(new ClassMember
                 {
                     Name = prop.Identifier.Text,
                     Type = prop.Type.ToString(),
                     Visibility = GetVisibility(prop.Modifiers),
-                    Purpose = ""
+                    Summary = GetXmlSummary(prop)
                 });
             }
 
-            foreach (var method in classDecl.Members.OfType<MethodDeclarationSyntax>())
+            foreach (var method in members.OfType<MethodDeclarationSyntax>())
             {
+                var paramDescriptions = GetXmlParamDescriptions(method);
+
                 classInfo.Methods.Add(new MethodMember
                 {
                     Name = method.Identifier.Text,
                     ReturnType = method.ReturnType.ToString(),
                     Visibility = GetVisibility(method.Modifiers),
-                    Purpose = "",
-                    Parameters = method.ParameterList.Parameters
-                        .Select(p => new ParameterInfo
-                        {
-                            Name = p.Identifier.Text,
-                            Type = p.Type.ToString(),
-                            Description = ""
-                        }).ToList()
+                    Summary = GetXmlSummary(method),
+                    Parameters = method.ParameterList.Parameters.Select(p => new ParameterInfo
+                    {
+                        Name = p.Identifier.Text,
+                        Type = p.Type.ToString(),
+                        Summary = paramDescriptions.TryGetValue(p.Identifier.Text, out var desc) ? desc : ""
+                    }).ToList()
                 });
             }
 
@@ -234,6 +237,54 @@ namespace Sep490ClassDocumentGenerator
                 ProcessClass(nestedClass, namespaceName, classInfos, fullClassName);
             }
         }
+        
+        private string GetXmlSummary(MemberDeclarationSyntax member)
+        {
+            var trivia = member.GetLeadingTrivia()
+                .Select(i => i.GetStructure())
+                .OfType<DocumentationCommentTriviaSyntax>()
+                .FirstOrDefault();
+
+            if (trivia == null) return "";
+
+            var summaryElement = trivia.Content.OfType<XmlElementSyntax>()
+                .FirstOrDefault(e => e.StartTag.Name.LocalName.Text == "summary");
+
+            return summaryElement?.Content.ToString().Trim().Replace("///", "").Trim() ?? "";
+        }
+        
+        private Dictionary<string, string> GetXmlParamDescriptions(MemberDeclarationSyntax member)
+        {
+            var result = new Dictionary<string, string>();
+
+            var trivia = member.GetLeadingTrivia()
+                .Select(i => i.GetStructure())
+                .OfType<DocumentationCommentTriviaSyntax>()
+                .FirstOrDefault();
+
+            if (trivia == null) return result;
+
+            var paramElements = trivia.Content.OfType<XmlElementSyntax>()
+                .Where(e => e.StartTag.Name.LocalName.Text == "param");
+
+            foreach (var param in paramElements)
+            {
+                var nameAttr = param.StartTag.Attributes
+                    .OfType<XmlNameAttributeSyntax>()
+                    .FirstOrDefault();
+
+                if (nameAttr != null)
+                {
+                    var paramName = nameAttr.Identifier.Identifier.Text;
+                    var text = param.Content.ToString().Trim();
+                    result[paramName] = text;
+                }
+            }
+
+            return result;
+        }
+
+
         
         private void ProcessInterface(InterfaceDeclarationSyntax interfaceDecl, string namespaceName, List<ClassInfo> classInfos, string parentInterface)
         {
@@ -253,7 +304,7 @@ namespace Sep490ClassDocumentGenerator
                     Name = prop.Identifier.Text,
                     Type = prop.Type.ToString(),
                     Visibility = "public", // Interface properties mặc định là public
-                    Purpose = ""
+                    Summary = ""
                 });
             }
 
@@ -264,13 +315,13 @@ namespace Sep490ClassDocumentGenerator
                     Name = method.Identifier.Text,
                     ReturnType = method.ReturnType.ToString(),
                     Visibility = "public", // Interface methods mặc định là public
-                    Purpose = "",
+                    Summary = "",
                     Parameters = method.ParameterList.Parameters
                         .Select(p => new ParameterInfo
                         {
                             Name = p.Identifier.Text,
                             Type = p.Type?.ToString() ?? "",
-                            Description = ""
+                            Summary = ""
                         }).ToList()
                 });
             }
@@ -750,7 +801,7 @@ namespace Sep490ClassDocumentGenerator
 
     // Original data models
     public class ClassInfo
-    {
+    {    
         public string ClassName { get; set; }
         public string Namespace { get; set; }
         public bool IsInterface { get; set; } = false;
@@ -763,7 +814,7 @@ namespace Sep490ClassDocumentGenerator
         public string Name { get; set; }
         public string Type { get; set; }
         public string Visibility { get; set; }
-        public string Purpose { get; set; }
+        public string Summary { get; set; }
     }
 
     public class MethodMember
@@ -771,7 +822,7 @@ namespace Sep490ClassDocumentGenerator
         public string Name { get; set; }
         public string ReturnType { get; set; }
         public string Visibility { get; set; }
-        public string Purpose { get; set; }
+        public string Summary { get; set; }
         public List<ParameterInfo> Parameters { get; set; } = new List<ParameterInfo>();
     }
 
@@ -779,7 +830,7 @@ namespace Sep490ClassDocumentGenerator
     {
         public string Name { get; set; }
         public string Type { get; set; }
-        public string Description { get; set; }
+        public string Summary { get; set; }
     
     }
 }

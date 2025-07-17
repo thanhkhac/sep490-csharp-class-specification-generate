@@ -6,23 +6,30 @@ namespace Sep490ClassDocumentGenerator
     public partial class ClassSelectionWindow : Window
     {
         public List<SelectableClass> FilteredClasses { get; private set; }
-
+        public List<SelectableClass> AllClasses => _allClasses;
+        
         private List<SelectableClass> _allClasses;
+        private readonly string _outputPath;
+        private readonly int _startIndex;
+        
 
-        public ClassSelectionWindow(List<ClassInfo> allClasses)
+        public Action<List<ClassInfo>, string, int> OnGenerate { get; set; }
+
+
+        public ClassSelectionWindow(List<ClassInfo> allClasses, string outputPath, int startIndex)
         {
             InitializeComponent();
 
             _allClasses = allClasses
-                .Select(c => new SelectableClass
-                {
-                    ClassInfo = c,
-                    IsSelected = true
-                })
+                .Select(c => new SelectableClass { ClassInfo = c, IsSelected = true })
                 .ToList();
 
             FilteredClasses = new List<SelectableClass>(_allClasses);
             ClassListView.ItemsSource = FilteredClasses;
+            
+            _outputPath = outputPath;
+            _startIndex = startIndex;
+            
             UpdateToggleButtonText();
         }
 
@@ -62,18 +69,6 @@ namespace Sep490ClassDocumentGenerator
                 ToggleAllButton.Content = allSelected ? "Deselect All" : "Select All";
             }
         }
-
-        private void OK_Click(object sender, RoutedEventArgs e)
-        {
-            DialogResult = true;
-            Close();
-        }
-
-        private void Cancel_Click(object sender, RoutedEventArgs e)
-        {
-            DialogResult = false;
-            Close();
-        }
         
         public List<ClassInfo> GetSelectedClasses()
         {
@@ -81,6 +76,28 @@ namespace Sep490ClassDocumentGenerator
                 .Where(c => c.IsSelected)
                 .Select(c => c.ClassInfo)
                 .ToList();
+        }
+        
+        private void Generate_Click(object sender, RoutedEventArgs e)
+        {
+            var selectedClasses = _allClasses
+                .Where(c => c.IsSelected)
+                .Select(c => c.ClassInfo)
+                .ToList();
+
+            if (!selectedClasses.Any())
+            {
+                MessageBox.Show("No classes selected.", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // Gọi delegate để thực hiện generation
+            OnGenerate?.Invoke(selectedClasses, _outputPath, _startIndex);
+        }
+        
+        private void Close_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
         }
     }
 

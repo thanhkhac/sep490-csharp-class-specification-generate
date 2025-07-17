@@ -140,22 +140,25 @@ namespace Sep490ClassDocumentGenerator
             try
             {
                 var classInfos = new List<ClassInfo>();
-                foreach (var file in selectedFiles) { ProcessFile(file, classInfos); }
-                var selectionWindow = new ClassSelectionWindow(classInfos);
-                
-                if (selectionWindow.ShowDialog() == true)
-                {
-                    var selectedClasses = selectionWindow.GetSelectedClasses();
-
-                    if (!selectedClasses.Any())
-                    {
-                        MessageBox.Show("No classes selected.", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        return;
-                    }
-
-                    CreateWordDoc(selectedClasses, OutputFileTextBox.Text, startIndex);
-                    MessageBox.Show("Document generated successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                foreach (var file in selectedFiles) 
+                { 
+                    ProcessFile(file, classInfos); 
                 }
+
+                var selectionWindow = new ClassSelectionWindow(classInfos, OutputFileTextBox.Text, startIndex);
+                selectionWindow.OnGenerate = (selectedClasses, outputPath, startIdx) =>
+                {
+                    try
+                    {
+                        CreateWordDoc(selectedClasses, outputPath, startIdx);
+                        MessageBox.Show("Document generated successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Error generating document: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                };
+                selectionWindow.ShowDialog();
             }
             catch (Exception ex) { MessageBox.Show($"Error generating document: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error); }
         }
@@ -575,7 +578,7 @@ namespace Sep490ClassDocumentGenerator
                             descParagraph.Append(
                                 CreateBoldUnderlineRun("Visibility:"),
                                 CreateNormalRun(" " + attr.Visibility),
-                                new Break(),
+                                new Run(new Break()),
                                 CreateBoldUnderlineRun("Type: "),
                                 CreateNormalRun(" " + attr.Type)
                             );
@@ -583,7 +586,7 @@ namespace Sep490ClassDocumentGenerator
                             if (!string.IsNullOrWhiteSpace(attr.Summary))
                             {
                                 descParagraph.Append(
-                                    new Break(),
+                                    new Run(new Break()),
                                     CreateBoldUnderlineRun("Description:"),
                                     CreateNormalRun(" " + attr.Summary)
                                 );
@@ -679,7 +682,7 @@ namespace Sep490ClassDocumentGenerator
                             descParagraph.Append(
                                 CreateBoldUnderlineRun("Visibility:"),
                                 CreateNormalRun($" {method.Visibility}"),
-                                new Break(),
+                                new Run(new Break()),
                                 CreateBoldUnderlineRun("Return: "),
                                 CreateNormalRun($" {method.ReturnType}")
                             );
@@ -687,20 +690,20 @@ namespace Sep490ClassDocumentGenerator
                             if (!string.IsNullOrWhiteSpace(method.Summary))
                             {
                                 descParagraph.Append(
-                                    new Break(),
+                                    new Run(new Break()),
                                     CreateBoldUnderlineRun("Description: "),
                                     CreateNormalRun(" " + method.Summary)
                                 );
                             }
 
                             descParagraph.Append(
-                                new Break(),
+                                new Run(new Break()),
                                 CreateBoldUnderlineRun("Parameters:")
                             );
 
                             if (method.Parameters.Any())
                             {
-                                descParagraph.Append(new Break());
+                                descParagraph.Append( new Run(new Break()));
                                 foreach (var param in method.Parameters)
                                 {
                                     var summary = string.IsNullOrWhiteSpace(param.Summary)
@@ -709,7 +712,7 @@ namespace Sep490ClassDocumentGenerator
 
                                     descParagraph.Append(
                                         CreateNormalRun($"- {param.Name}: {param.Type}{summary}"),
-                                        new Break()
+                                        new Run(new Break())
                                     );
                                 }
                             }

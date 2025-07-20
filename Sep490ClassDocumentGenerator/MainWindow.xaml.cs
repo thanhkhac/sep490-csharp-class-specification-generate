@@ -388,7 +388,7 @@ namespace Sep490ClassDocumentGenerator
                 var titlePara = new Paragraph(new Run(new Text($"{startIndex}. Class Specifications")));
                 titlePara.ParagraphProperties = new ParagraphProperties(new ParagraphStyleId()
                 {
-                    Val = "Heading1"
+                    Val = "Heading2"
                 });
                 body.AppendChild(titlePara);
 
@@ -400,7 +400,7 @@ namespace Sep490ClassDocumentGenerator
                     var namespacePara = new Paragraph(new Run(new Text($"{startIndex}.{sectionIndex} {displayNamespace}")));
                     namespacePara.ParagraphProperties = new ParagraphProperties(new ParagraphStyleId()
                     {
-                        Val = "Heading2"
+                        Val = "Heading3"
                     });
                     body.AppendChild(namespacePara);
 
@@ -411,7 +411,7 @@ namespace Sep490ClassDocumentGenerator
                         var classPara = new Paragraph(new Run(new Text($"{startIndex}.{sectionIndex}.{classIndex} {classInfo.ClassName}")));
                         classPara.ParagraphProperties = new ParagraphProperties(new ParagraphStyleId()
                         {
-                            Val = "Heading3"
+                            Val = "Heading4"
                         });
                         body.AppendChild(classPara);
 
@@ -744,47 +744,6 @@ namespace Sep490ClassDocumentGenerator
                 new Style()
                 {
                     Type = StyleValues.Paragraph,
-                    StyleId = "Heading1",
-                    BasedOn = new BasedOn()
-                    {
-                        Val = "Normal"
-                    },
-                    NextParagraphStyle = new NextParagraphStyle()
-                    {
-                        Val = "Normal"
-                    },
-                    PrimaryStyle = new PrimaryStyle(),
-                    StyleName = new StyleName()
-                    {
-                        Val = "heading 1"
-                    },
-                    StyleRunProperties = new StyleRunProperties(
-                        new Bold(),
-                        new FontSize()
-                        {
-                            Val = "32"
-                        },
-                        new RunFonts()
-                        {
-                            Ascii = "Times New Roman",
-                            HighAnsi = "Times New Roman"
-                        }
-                    ),
-                    StyleParagraphProperties = new StyleParagraphProperties(
-                        new OutlineLevel()
-                        {
-                            Val = 0
-                        },
-                        new SpacingBetweenLines()
-                        {
-                            After = "200"
-                        },
-                        new KeepNext()
-                    )
-                },
-                new Style()
-                {
-                    Type = StyleValues.Paragraph,
                     StyleId = "Heading2",
                     BasedOn = new BasedOn()
                     {
@@ -814,11 +773,11 @@ namespace Sep490ClassDocumentGenerator
                     StyleParagraphProperties = new StyleParagraphProperties(
                         new OutlineLevel()
                         {
-                            Val = 1
+                            Val = 0
                         },
                         new SpacingBetweenLines()
                         {
-                            After = "180"
+                            After = "200"
                         },
                         new KeepNext()
                     )
@@ -855,6 +814,47 @@ namespace Sep490ClassDocumentGenerator
                     StyleParagraphProperties = new StyleParagraphProperties(
                         new OutlineLevel()
                         {
+                            Val = 1
+                        },
+                        new SpacingBetweenLines()
+                        {
+                            After = "180"
+                        },
+                        new KeepNext()
+                    )
+                },
+                new Style()
+                {
+                    Type = StyleValues.Paragraph,
+                    StyleId = "Heading4",
+                    BasedOn = new BasedOn()
+                    {
+                        Val = "Normal"
+                    },
+                    NextParagraphStyle = new NextParagraphStyle()
+                    {
+                        Val = "Normal"
+                    },
+                    PrimaryStyle = new PrimaryStyle(),
+                    StyleName = new StyleName()
+                    {
+                        Val = "heading 4"
+                    },
+                    StyleRunProperties = new StyleRunProperties(
+                        new Bold(),
+                        new FontSize()
+                        {
+                            Val = "22"
+                        },
+                        new RunFonts()
+                        {
+                            Ascii = "Times New Roman",
+                            HighAnsi = "Times New Roman"
+                        }
+                    ),
+                    StyleParagraphProperties = new StyleParagraphProperties(
+                        new OutlineLevel()
+                        {
                             Val = 2
                         },
                         new SpacingBetweenLines()
@@ -876,7 +876,7 @@ namespace Sep490ClassDocumentGenerator
                     StyleRunProperties = new StyleRunProperties(
                         new FontSize()
                         {
-                            Val = "24"
+                            Val = "22"
                         },
                         new RunFonts()
                         {
@@ -950,12 +950,12 @@ namespace Sep490ClassDocumentGenerator
                 new TableCellMargin(
                     new LeftMargin()
                     {
-                        Width = "100",
+                        Width = "50",
                         Type = TableWidthUnitValues.Dxa
                     },
                     new RightMargin()
                     {
-                        Width = "100",
+                        Width = "50",
                         Type = TableWidthUnitValues.Dxa
                     },
                     new TopMargin()
